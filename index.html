@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard IoT Rimuru</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Cấu hình Tailwind: Sử dụng Font Inter
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <!-- Thư viện Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- FIX LỖI PAHO IS NOT DEFINED: Dùng link CDN mới, ổn định hơn cho Paho MQTT -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    
+    <!-- Thư viện XLSX để xuất Excel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    
+    <style>
+        /* Các style custom để định vị giá trị số trên Gauge */
+        .gauge-wrapper {
+            position: relative;
+            /* Điều chỉnh padding dưới để có không gian cho giá trị */
+            padding-bottom: 20px; 
+            max-width: 100%;
+        }
+        .gauge-value-display {
+            position: absolute;
+            top: 55%; 
+            left: 50%; 
+            transform: translate(-50%, -50%);
+            font-size: 2.5rem; /* text-4xl */
+            font-weight: 700; /* font-bold */
+            line-height: 1;
+        }
+        /* Đặt chiều cao cố định cho canvas */
+        .chart-container {
+            height: 250px;
+            max-width: 100%;
+        }
+        /* Hiển thị card đẹp hơn trên di động */
+        .grid {
+            /* Thay đổi để đảm bảo 4 card hiển thị đẹp */
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+        }
+    </style>
+</head>
+<body class="font-sans min-h-screen p-4 md:p-8 bg-slate-100">
+
+    <button id="export" class="fixed top-4 left-4 md:top-6 md:left-6 p-2 md:px-4 md:py-2 text-sm md:text-base font-semibold border-none bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-lg transition duration-150 z-10">
+        ⬇ Xuất Excel
+    </button>
+
+    <h1 class="text-3xl md:text-4xl font-extrabold text-gray-800 mb-4 mt-16 md:mt-10 text-center">Dashboard IoT Rimuru</h1>
+
+    <!-- Trạng thái kết nối MQTT mới -->
+    <div id="mqttStatus" class="text-center mb-8 p-3 rounded-lg font-medium shadow-md transition duration-300 bg-yellow-100 text-yellow-700 border border-yellow-300">
+        🟡 Đang kết nối MQTT...
+    </div>
+
+    <div class="grid">
+
+        <!-- Card Nhiệt độ -->
+        <div class="bg-white p-6 rounded-xl shadow-xl hover:shadow-2xl transition duration-300">
+            <h3 class="text-xl font-bold text-gray-700 mb-4 border-b pb-2 flex items-center">
+                <span class="mr-2 text-red-500">🌡️</span> Nhiệt độ (<span id="tempUnit">°C</span>)
+            </h3>
+            <div class="gauge-wrapper">
+                <div class="chart-container">
+                    <canvas id="gaugeTemp"></canvas>
+                </div>
+                <!-- Giá trị hiển thị số lớn, màu xanh blue -->
+                <div id="valueTemp" class="gauge-value-display text-blue-600">--</div>
+            </div>
+            <div class="chart-container">
+                <canvas id="lineTemp"></canvas>
+            </div>
+        </div>
+
+        <!-- Card Độ ẩm -->
+        <div class="bg-white p-6 rounded-xl shadow-xl hover:shadow-2xl transition duration-300">
+            <h3 class="text-xl font-bold text-gray-700 mb-4 border-b pb-2 flex items-center">
+                <span class="mr-2 text-cyan-500">💧</span> Độ ẩm (%)
+            </h3>
+            <div class="gauge-wrapper">
+                <div class="chart-container">
+                    <canvas id="gaugeHumid"></canvas>
+                </div>
+                <!-- Giá trị hiển thị số lớn, màu xanh lá -->
+                <div id="valueHumid" class="gauge-value-display text-green-600">--</div>
+            </div>
+            <div class="chart-container">
+                <canvas id="lineHumid"></canvas>
+            </div>
+        </div>
+
+        <!-- Card Bụi PM2.5 -->
+        <div class="bg-white p-6 rounded-xl shadow-xl hover:shadow-2xl transition duration-300">
+            <h3 class="text-xl font-bold text-gray-700 mb-4 border-b pb-2 flex items-center">
+                <span class="mr-2 text-amber-500">🌫️</span> Bụi PM2.5 (<span id="pmUnit">µg/m³</span>)
+            </h3>
+            <div class="gauge-wrapper">
+                <div class="chart-container">
+                    <canvas id="gaugePM"></canvas>
+                </div>
+                <!-- Giá trị hiển thị số lớn, màu cam -->
+                <div id="valuePM" class="gauge-value-display text-orange-600">--</div>
+            </div>
+            <div class="chart-container">
+                <canvas id="linePM"></canvas>
+            </div>
+        </div>
+
+        <!-- Card Khí Gas (MQ-2) - ĐÃ THÊM -->
+        <div class="bg-white p-6 rounded-xl shadow-xl hover:shadow-2xl transition duration-300">
+            <h3 class="text-xl font-bold text-gray-700 mb-4 border-b pb-2 flex items-center">
+                <span class="mr-2 text-fuchsia-500">🔥</span> Khí Gas MQ-2 (<span id="gasUnit">PPM</span>)
+            </h3>
+            <div class="gauge-wrapper">
+                <div class="chart-container">
+                    <canvas id="gaugeGas"></canvas>
+                </div>
+                <!-- Giá trị hiển thị số lớn, màu tím -->
+                <div id="valueGas" class="gauge-value-display text-fuchsia-600">--</div>
+            </div>
+            <div class="chart-container">
+                <canvas id="lineGas"></canvas>
+            </div>
+        </div>
+        
+    </div>
+
+<script>
+    // ========== Chart setup (giữ nguyên logic) ==========
+    function createGauge(ctx, label, max, color = '#2563eb'){
+        return new Chart(ctx, {
+            type: 'doughnut',
+            data: { 
+                datasets:[{ 
+                    data:[0, max], 
+                    backgroundColor:[color, '#e5e7eb'], // Màu nền xám nhạt (gray-200)
+                    borderWidth: 0 // Loại bỏ border
+                }] 
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                circumference:180, 
+                rotation:270, 
+                cutout:'80%', // Tăng độ dày của vòng
+                plugins:{ 
+                    tooltip:{enabled:false}, 
+                    legend:{display:false} 
+                }
+            }
+        });
+    }
+    function createLine(ctx, label, color = '#2563eb'){
+        return new Chart(ctx,{
+            type:'line',
+            data:{
+                labels:[],
+                datasets:[{
+                    label:label,
+                    data:[],
+                    borderColor:color,
+                    tension: 0.4, // Tạo đường cong mềm mại hơn
+                    pointRadius: 3,
+                    pointBackgroundColor: color,
+                    fill: false
+                }]
+            },
+            options:{
+                responsive: true,
+                maintainAspectRatio: false,
+                scales:{
+                    x:{
+                        title:{display:true,text:"Thời gian"},
+                        grid: { display: false }
+                    },
+                    y:{
+                        beginAtZero:true,
+                        title:{display:true,text:label},
+                    }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+    }
+
+    // Khởi tạo Charts
+    let gaugeTemp = createGauge(document.getElementById('gaugeTemp'), 'Nhiệt độ', 50, '#2563eb');
+    let gaugeHumid = createGauge(document.getElementById('gaugeHumid'), 'Độ ẩm', 100, '#059669');
+    let gaugePM = createGauge(document.getElementById('gaugePM'), 'PM2.5', 300, '#ea580c');
+    let gaugeGas = createGauge(document.getElementById('gaugeGas'), 'Khí Gas (MQ-2)', 1000, '#c026d3'); // Max 1000 PPM, Fuchsia-600
+
+    let lineTemp = createLine(document.getElementById('lineTemp'), 'Nhiệt độ', '#2563eb');
+    let lineHumid = createLine(document.getElementById('lineHumid'), 'Độ ẩm', '#059669');
+    let linePM = createLine(document.getElementById('linePM'), 'PM2.5', '#ea580c');
+    let lineGas = createLine(document.getElementById('lineGas'), 'Khí Gas (PPM)', '#c026d3'); // Fuchsia-600
+
+    let dataLog = []; // lưu dữ liệu để export
+
+    function updateCharts(type, value){
+        // Giá trị nhận được cần làm tròn 1 chữ số thập phân
+        value = parseFloat(value.toFixed(1)); 
+        if (typeof value !== "number" || isNaN(value)) return;
+
+        let now = new Date().toLocaleTimeString();
+        let chart, gauge, max, valueEl, unit, color;
+
+        // Cấu hình dựa trên loại dữ liệu
+        if(type==="temp"){ 
+            chart=lineTemp; 
+            gauge=gaugeTemp; 
+            max=50; 
+            valueEl=document.getElementById('valueTemp'); 
+            unit="°C"; 
+            color="#2563eb"; // blue-600 
+        }
+        else if(type==="humid"){ 
+            chart=lineHumid; 
+            gauge=gaugeHumid; 
+            max=100; 
+            valueEl=document.getElementById('valueHumid'); 
+            unit="%"; 
+            color="#059669"; // green-600
+        }
+        else if(type==="pm25"){ 
+            chart=linePM; 
+            gauge=gaugePM; 
+            max=300; 
+            valueEl=document.getElementById('valuePM'); 
+            unit="µg/m³"; 
+            color="#ea580c"; // orange-600
+        }
+        // ĐÃ THÊM: Xử lý Khí Gas
+        else if(type==="gas"){
+            chart=lineGas; 
+            gauge=gaugeGas; 
+            max=1000; 
+            valueEl=document.getElementById('valueGas'); 
+            unit="PPM"; 
+            color="#c026d3"; // fuchsia-600
+        }
+        else return;
+
+        // 1. Update Gauge visual: Cập nhật dữ liệu và màu sắc
+        gauge.data.datasets[0].data = [value, Math.max(0, max-value)];
+        gauge.data.datasets[0].backgroundColor = [color, '#e5e7eb'];
+        gauge.update();
+
+        // 2. Update Gauge text value: Cập nhật giá trị số lớn
+        valueEl.innerText = `${value}${unit}`;
+        
+        // 3. Update Line chart
+        chart.data.labels.push(now);
+        chart.data.datasets[0].data.push(value);
+        
+        // Giới hạn 12 điểm dữ liệu (2 phút nếu dữ liệu gửi mỗi 10s)
+        if(chart.data.labels.length>12){
+            chart.data.labels.shift(); 
+            chart.data.datasets[0].data.shift();
+        }
+        chart.data.datasets[0].borderColor = color;
+        chart.data.datasets[0].pointBackgroundColor = color;
+        chart.update();
+
+        // 4. Lưu log
+        dataLog.push({timestamp: new Date().toLocaleString(), type:type, value:value, unit: unit});
+    }
+    
+    // Hàm cập nhật trạng thái kết nối MQTT trên UI
+    function setStatus(message, colorClass) {
+        const statusEl = document.getElementById('mqttStatus');
+        if (statusEl) {
+            statusEl.innerText = message;
+            statusEl.className = `text-center mb-8 p-3 rounded-lg font-medium shadow-md transition duration-300 ${colorClass}`;
+        }
+    }
+
+
+    // ========== MQTT setup - ĐANG DÙNG MOSQUITTO PORT 8081 (WSS/SSL) ==========
+    // Đảm bảo dùng WSS (Port 8081) để fix lỗi bảo mật SecurityError trên trang HTTPS.
+    const MQTT_HOST = "test.mosquitto.org"; 
+    const MQTT_PORT = 8081; // WebSocket Secure (WSS) Port 8081
+    const MQTT_PATH = "/mqtt"; 
+    const CLIENT_ID = "web_" + Math.random().toString(16).substr(2,8);
+
+    // Tạo client với path rõ ràng (4 tham số)
+    let client; 
+    try {
+        client = new Paho.MQTT.Client(MQTT_HOST, Number(MQTT_PORT), MQTT_PATH, CLIENT_ID);
+    } catch (e) {
+        console.error("Lỗi khởi tạo Paho Client. Đảm bảo thư viện Paho đã được tải thành công.", e);
+        setStatus("🔴 LỖI: Không tải được thư viện MQTT.", "bg-red-100 text-red-700 border border-red-300");
+    }
+
+    if (client) {
+        client.onConnectionLost = function(responseObject){
+            setStatus("🔴 MẤT KẾT NỐI: Đang thử lại...", "bg-red-100 text-red-700 border border-red-300");
+            console.warn("[MQTT] Kết nối bị mất:", responseObject && responseObject.errorMessage);
+            // Thử reconnect sau 3s
+            setTimeout(connectMQTT, 3000); 
+        };
+        client.onMessageArrived = onMessage;
+    }
+
+    function connectMQTT(){
+        if (!client) return; // Nếu client chưa được khởi tạo thì không làm gì
+        
+        // Hiển thị giao thức kết nối để dễ debug (wss://)
+        setStatus("🟡 Đang kết nối MQTT (wss)...", "bg-yellow-100 text-yellow-700 border border-yellow-300");
+        console.log(`[MQTT] Thử kết nối wss://${MQTT_HOST}:${MQTT_PORT}${MQTT_PATH}  clientId=${CLIENT_ID}`);
+        client.connect({
+            onSuccess: onConnect,
+            onFailure: function(err){
+                console.error("[MQTT] Kết nối thất bại:", err);
+                // Nếu kết nối thất bại, chuyển sang trạng thái lỗi đỏ và thử lại.
+                setStatus(`🔴 KẾT NỐI THẤT BẠI: Thử lại sau 3s (Port: ${MQTT_PORT})`, "bg-red-100 text-red-700 border border-red-300");
+                setTimeout(connectMQTT, 3000);
+            },
+            // QUAN TRỌNG: Bật SSL để sử dụng giao thức wss:// (WebSocket Secure)
+            useSSL: true, 
+            timeout: 10
+        });
+    }
+
+    // gọi connect sau khi đảm bảo Paho Client được khởi tạo
+    if (client) {
+        connectMQTT();
+    }
+
+
+    function onConnect(){
+        setStatus("🟢 KẾT NỐI THÀNH CÔNG!", "bg-green-100 text-green-700 border border-green-300");
+        console.log("[MQTT] Kết nối thành công. Đang subscribe các topic...");
+        // Đăng ký nhận dữ liệu từ 4 topic
+        client.subscribe("sensor/temp");
+        client.subscribe("sensor/humid");
+        client.subscribe("sensor/pm25");
+        client.subscribe("sensor/gas"); // ĐÃ THÊM TOPIC KHÍ GAS
+        console.log("[MQTT] Đã subscribed: sensor/temp, sensor/humid, sensor/pm25, sensor/gas");
+    }
+
+    function onMessage(msg){
+        console.log("[MQTT] Message arrived:", msg.destinationName, "payload:", msg.payloadString);
+        let topic = msg.destinationName;
+        
+        let raw = msg.payloadString.trim();
+        let val = parseFloat(raw);
+        if (isNaN(val)){
+            console.warn("[MQTT] Payload không phải số:", raw);
+            return;
+        }
+
+        if(topic === "sensor/temp") updateCharts("temp", val);
+        else if(topic === "sensor/humid") updateCharts("humid", val);
+        else if(topic === "sensor/pm25") updateCharts("pm25", val);
+        // ĐÃ THÊM: Xử lý dữ liệu Khí Gas
+        else if(topic === "sensor/gas") updateCharts("gas", val);
+        else console.log("[MQTT] Topic không xử lý:", topic);
+    }
+
+    // ========== Export Excel ==========
+    document.getElementById('export').onclick = function(){
+        if (dataLog.length === 0) {
+            console.warn("Chưa có dữ liệu để xuất.");
+            return;
+        }
+        let ws = XLSX.utils.json_to_sheet(dataLog);
+        let wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Sensor Data Log");
+        XLSX.writeFile(wb,"sensor_data_log.xlsx");
+        console.log(`Xuất thành công ${dataLog.length} dòng dữ liệu.`);
+    };
+
+    console.log("Dashboard ready. Open Console (F12) để xem log kết nối MQTT.");
+</script>
+
+</body>
+</html>
