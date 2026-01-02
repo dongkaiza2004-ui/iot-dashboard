@@ -1,457 +1,323 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="utf-8" />
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard IoT Rimuru - Sheets & Export</title>
-    <!-- Load Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        // Cấu hình Tailwind: Sử dụng Font Inter
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                }
-            }
-        }
-    </script>
-    <!-- Thư viện Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
-    <!-- KHÔNG CẦN Paho MQTT nữa -->
-    
-    <!-- Thư viện XLSX để xuất Excel -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-    
-    <style>
-        /* Các style custom để định vị giá trị số trên Gauge */
-        .gauge-wrapper {
-            position: relative;
-            padding-bottom: 20px; 
-            max-width: 100%;
-        }
-        .gauge-value-display {
-            position: absolute;
-            top: 55%; 
-            left: 50%; 
-            transform: translate(-50%, -50%);
-            font-size: 2.5rem; /* text-4xl */
-            font-weight: 700; /* font-bold */
-            line-height: 1;
-        }
-        /* Đặt chiều cao cố định cho canvas */
-        .chart-container {
-            height: 250px;
-            max-width: 100%;
-        }
-        /* Hiển thị card đẹp hơn trên di động */
-        .grid-container {
-            display: grid;
-            /* Thay đổi để đảm bảo 4 card hiển thị đẹp và responsive */
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 24px;
-        }
-    </style>
+    <title>Dashboard RIMURU - IoT System</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
-<body class="font-sans min-h-screen p-4 md:p-8 bg-slate-100">
+<body>
 
-    <button id="export" class="fixed top-4 left-4 md:top-6 md:left-6 p-2 md:px-4 md:py-2 text-sm md:text-base font-semibold border-none bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-lg transition duration-150 z-10">
-        ⬇ Xuất Excel
-    </button>
-
-    <h1 class="text-3xl md:text-4xl font-extrabold text-gray-800 mb-4 mt-16 md:mt-10 text-center">Dashboard IoT Rimuru</h1>
-    
-    <!-- Thanh tùy chọn địa điểm -->
-    <div class="mb-6 flex justify-center items-center">
-        <label for="location-select" class="mr-3 text-lg font-bold text-gray-700">📍 Địa Điểm Hiển Thị:</label>
-        <select id="location-select" class="p-2 border border-gray-300 bg-white rounded-lg shadow-md hover:border-indigo-500 focus:ring-2 focus:ring-indigo-500 transition duration-150">
-            <option value="A101">Văn phòng A101</option>
-            <option value="B202">Phòng họp B202</option>
-            <option value="C303">Kho lạnh C303</option>
-            <option value="D404">Phòng Lab D404</option>
-        </select>
+    <div class="sidebar">
+        <div class="logo">
+            <h2>RIMURU</h2>
+        </div>
+        <nav class="sidebar-nav">
+            <ul>
+                <li><a href="#" class="nav-link active" data-target="dashboard"><i class="fas fa-tachometer-alt"></i> 📊 Dashboard</a></li>
+                <li><a href="#" class="nav-link" data-target="monitoring"><i class="fas fa-thermometer-half"></i> 🌡 Giám sát</a></li>
+                <li><a href="#" class="nav-link" data-target="statistics"><i class="fas fa-chart-line"></i> 📈 Biểu đồ & Thống kê</a></li>
+                <li><a href="#" class="nav-link" data-target="alerts"><i class="fas fa-bell"></i> 🚨 Cảnh báo</a></li>
+                <li><a href="#" class="nav-link" data-target="data"><i class="fas fa-database"></i> 🗃 Dữ liệu</a></li>
+                <li><a href="#" class="nav-link" data-target="settings"><i class="fas fa-cog"></i> ⚙ Cài đặt</a></li>
+                <li><a href="#" class="nav-link" data-target="help"><i class="fas fa-question-circle"></i> ❓ Trợ giúp</a></li>
+            </ul>
+        </nav>
     </div>
 
-    <!-- Trạng thái kết nối Sheets -->
-    <div id="status" class="text-center mb-8 p-3 rounded-lg font-medium shadow-md transition duration-300 bg-yellow-100 text-yellow-700 border border-yellow-300">
-        🟡 Đang tải dữ liệu từ Google Sheets...
-    </div>
+    <div class="main-content">
 
-    <div class="grid-container">
-
-        <!-- Card Nhiệt độ -->
-        <div class="bg-white p-6 rounded-xl shadow-xl hover:shadow-2xl transition duration-300">
-            <h3 class="text-xl font-bold text-gray-700 mb-4 border-b pb-2 flex items-center">
-                <span class="mr-2 text-red-500">🌡️</span> Nhiệt độ (<span id="tempUnit">°C</span>)
-            </h3>
-            <div class="gauge-wrapper">
-                <div class="chart-container">
-                    <canvas id="gaugeTemp"></canvas>
-                </div>
-                <div id="valueTemp" class="gauge-value-display text-red-600">--</div>
-            </div>
-            <div class="chart-container">
-                <canvas id="lineTemp"></canvas>
-            </div>
-        </div>
-
-        <!-- Card Độ ẩm -->
-        <div class="bg-white p-6 rounded-xl shadow-xl hover:shadow-2xl transition duration-300">
-            <h3 class="text-xl font-bold text-gray-700 mb-4 border-b pb-2 flex items-center">
-                <span class="mr-2 text-cyan-500">💧</span> Độ ẩm (%)
-            </h3>
-            <div class="gauge-wrapper">
-                <div class="chart-container">
-                    <canvas id="gaugeHumid"></canvas>
-                </div>
-                <div id="valueHumid" class="gauge-value-display text-cyan-600">--</div>
-            </div>
-            <div class="chart-container">
-                <canvas id="lineHumid"></canvas>
-            </div>
-        </div>
-
-        <!-- Card Bụi PM2.5 -->
-        <div class="bg-white p-6 rounded-xl shadow-xl hover:shadow-2xl transition duration-300">
-            <h3 class="text-xl font-bold text-gray-700 mb-4 border-b pb-2 flex items-center">
-                <span class="mr-2 text-amber-500">🌫️</span> Bụi PM2.5 (<span id="pmUnit">µg/m³</span>)
-            </h3>
-            <div class="gauge-wrapper">
-                <div class="chart-container">
-                    <canvas id="gaugePM"></canvas>
-                </div>
-                <div id="valuePM" class="gauge-value-display text-amber-600">--</div>
-            </div>
-            <div class="chart-container">
-                <canvas id="linePM"></canvas>
-            </div>
-        </div>
-
-        <!-- Card Khí Gas (MQ-2) -->
-        <div class="bg-white p-6 rounded-xl shadow-xl hover:shadow-2xl transition duration-300">
-            <h3 class="text-xl font-bold text-gray-700 mb-4 border-b pb-2 flex items-center">
-                <span class="mr-2 text-fuchsia-500">🔥</span> Khí Gas MQ-2 (<span id="gasUnit">PPM</span>)
-            </h3>
-            <div class="gauge-wrapper">
-                <div class="chart-container">
-                    <canvas id="gaugeGas"></canvas>
-                </div>
-                <div id="valueGas" class="gauge-value-display text-fuchsia-600">--</div>
-            </div>
-            <div class="chart-container">
-                <canvas id="lineGas"></canvas>
-            </div>
-        </div>
-        
-    </div>
-
-<script>
-    // URL Google Sheets Web App (Sử dụng cho GET request)
-    // HÃY ĐẢM BẢO URL NÀY LÀ URL ĐÃ TRIỂN KHAI LẠI VỚI CODE.GS MỚI VÀ CÓ QUYỀN TRUY CẬP LÀ "ANYONE"
-    const GOOGLE_SHEET_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwhTF9oBVzyj8QJrQak8oJ33r3Y5sb9E3t3pU96MB9cQt6CT6TCBKiZiFTQa9Oolbc/exec";
-
-    const REFRESH_INTERVAL_SECONDS = 3; // Tự động làm mới sau 60 giây
-
-    let currentLocation = document.getElementById('location-select').value; 
-    let dataLog = []; // Lưu 30 bản ghi mới nhất từ Sheets để hiển thị và export Excel
-    let refreshTimer;
-
-    // Màu sắc cho các biểu đồ
-    const chartColors = {
-        temp: { primary: '#ef4444', text: '#dc2626' }, // Red
-        humid: { primary: '#06b6d4', text: '#0891b2' }, // Cyan
-        pm25: { primary: '#f59e0b', text: '#d97706' }, // Amber
-        gas: { primary: '#c026d3', text: '#a21caf' } // Fuchsia
-    };
-    
-    // Mapping các Chart để dễ dàng truy cập
-    let allCharts = {};
-
-    // ========== Chart Utility Functions ==========
-    function createGauge(ctx, label, max, color = '#2563eb'){
-        return new Chart(ctx, {
-            type: 'doughnut',
-            data: { 
-                datasets:[{ 
-                    data:[0, max], 
-                    backgroundColor:[color, '#e5e7eb'], 
-                    borderWidth: 0 
-                }] 
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                circumference:180, 
-                rotation:270, 
-                cutout:'80%', 
-                plugins:{ 
-                    tooltip:{enabled:false}, 
-                    legend:{display:false} 
-                }
-            }
-        });
-    }
-    function createLine(ctx, label, color = '#2563eb'){
-        return new Chart(ctx,{
-            type:'line',
-            data:{
-                labels:[],
-                datasets:[{
-                    label:label,
-                    data:[],
-                    borderColor:color,
-                    tension: 0.4, 
-                    pointRadius: 3,
-                    pointBackgroundColor: color,
-                    fill: false
-                }]
-            },
-            options:{
-                responsive: true,
-                maintainAspectRatio: false,
-                scales:{
-                    x:{
-                        title:{display:true,text:"Thời gian"},
-                        grid: { display: false }
-                    },
-                    y:{
-                        beginAtZero:true,
-                        title:{display:true,text:label},
-                    }
-                },
-                plugins: {
-                    legend: { display: false }
-                }
-            }
-        });
-    }
-
-    /**
-     * Hàm khởi tạo và gán các biểu đồ
-     */
-    function initializeCharts() {
-        allCharts = {
-            temp: { gauge: createGauge(document.getElementById('gaugeTemp'), 'Nhiệt độ', 50, chartColors.temp.primary), line: createLine(document.getElementById('lineTemp'), 'Nhiệt độ', chartColors.temp.primary), max: 50, valueEl: document.getElementById('valueTemp'), unit: '°C', color: chartColors.temp },
-            humid: { gauge: createGauge(document.getElementById('gaugeHumid'), 'Độ ẩm', 100, chartColors.humid.primary), line: createLine(document.getElementById('lineHumid'), 'Độ ẩm', chartColors.humid.primary), max: 100, valueEl: document.getElementById('valueHumid'), unit: '%', color: chartColors.humid },
-            pm25: { gauge: createGauge(document.getElementById('gaugePM'), 'Bụi PM2.5', 300, chartColors.pm25.primary), line: createLine(document.getElementById('linePM'), 'Bụi PM2.5', chartColors.pm25.primary), max: 300, valueEl: document.getElementById('valuePM'), unit: 'µg/m³', color: chartColors.pm25 },
-            gas: { gauge: createGauge(document.getElementById('gaugeGas'), 'Khí Gas (MQ-2)', 1000, chartColors.gas.primary), line: createLine(document.getElementById('lineGas'), 'Khí Gas (PPM)', chartColors.gas.primary), max: 1000, valueEl: document.getElementById('valueGas'), unit: 'PPM', color: chartColors.gas }
-        };
-    }
-    initializeCharts();
-    
-    /**
-     * Hàm xóa tất cả dữ liệu trên biểu đồ và log Excel
-     */
-    function clearAllCharts() {
-        for (const type in allCharts) {
-            const chartSet = allCharts[type];
-            chartSet.line.data.labels = [];
-            chartSet.line.data.datasets[0].data = [];
-            chartSet.line.update();
-            chartSet.gauge.data.datasets[0].data = [0, chartSet.max];
-            chartSet.gauge.update();
-            chartSet.valueEl.innerText = '--';
-        }
-        dataLog = [];
-    }
-    
-    /**
-     * Cập nhật biểu đồ Line, Gauge và giá trị hiển thị từ dữ liệu đã tải về
-     * @param {Array} records - Mảng các đối tượng dữ liệu (30 bản ghi mới nhất)
-     */
-    function updateCharts(records) {
-        clearAllCharts();
-        
-        // 1. Lưu lại log mới (đã là 30 bản ghi mới nhất)
-        dataLog = records;
-
-        // 2. Chuẩn bị dữ liệu cho biểu đồ Line
-        let lineData = {
-            temp: [],
-            humid: [],
-            pm25: [],
-            gas: [],
-            timestamps: []
-        };
-
-        records.forEach(record => {
-            // Lấy giờ:phút:giây từ timestamp
-            // Bổ sung: Nếu timestamp là đối tượng Date/string hợp lệ, sẽ hiển thị giờ
-            const dateObj = new Date(record.timestamp);
-            const time = !isNaN(dateObj) ? dateObj.toLocaleTimeString('vi-VN', { hour12: false }) : record.timestamp;
+        <div id="dashboard" class="tab-content active-tab"> 
+            <h1>Tổng quan hệ thống</h1>
             
-            lineData.timestamps.push(time);
-            lineData.temp.push(parseFloat(record.temp));
-            lineData.humid.push(parseFloat(record.humid));
-            lineData.pm25.push(parseFloat(record.pm25));
-            lineData.gas.push(parseFloat(record.gas));
-        });
+            <div class="stat-cards-row">
+                <div class="stat-card temperature">
+                    <div class="card-content">
+                        <span class="value">-- °C</span>
+                        <span class="label">Nhiệt độ hiện tại</span>
+                    </div>
+                    <i class="fas fa-thermometer-half card-icon-bg"></i>
+                </div>
 
-        // 3. Cập nhật Biểu đồ Line
-        for (const type in allCharts) {
-            const chartSet = allCharts[type];
-            chartSet.line.data.labels = lineData.timestamps;
-            chartSet.line.data.datasets[0].data = lineData[type];
-            chartSet.line.update();
-        }
+                <div class="stat-card humidity">
+                    <div class="card-content">
+                        <span class="value">--%</span>
+                        <span class="label">Độ ẩm hiện tại</span>
+                    </div>
+                    <i class="fas fa-water card-icon-bg"></i>
+                </div>
 
-        // 4. Cập nhật Biểu đồ Gauge và Giá trị hiện tại (lấy từ bản ghi mới nhất)
-        const latestRecord = records[records.length - 1];
-        if (latestRecord) {
-            ['temp', 'humid', 'pm25', 'gas'].forEach(type => {
-                const chartSet = allCharts[type];
-                // Ép kiểu float và làm tròn để hiển thị
-                const value = parseFloat(parseFloat(latestRecord[type]).toFixed(1));
-                
-                chartSet.gauge.data.datasets[0].data = [value, Math.max(0, chartSet.max - value)];
-                chartSet.gauge.update();
-                chartSet.valueEl.innerText = `${value}${chartSet.unit}`;
-            });
-        }
-    }
+                <div class="stat-card gas">
+                    <div class="card-content">
+                        <span class="value">-- ppm</span>
+                        <span class="label">Khí Gas</span>
+                    </div>
+                    <i class="fas fa-burn card-icon-bg"></i>
+                </div>
 
+                <div class="stat-card dust">
+                    <div class="card-content">
+                        <span class="value">-- mg/m³</span>
+                        <span class="label">Bụi PM2.5</span>
+                    </div>
+                    <i class="fas fa-cloud card-icon-bg"></i>
+                </div>
 
-    /**
-     * Hàm cập nhật trạng thái trên UI
-     */
-    function setStatus(status, message) {
-        const statusEl = document.getElementById('status');
-        let colorClass = "";
-        
-        if (status === 'success') {
-            colorClass = "bg-green-100 text-green-700 border border-green-300";
-        } else if (status === 'loading') {
-            colorClass = "bg-yellow-100 text-yellow-700 border border-yellow-300";
-        } else { // error
-            colorClass = "bg-red-100 text-red-700 border border-red-300";
-        }
+                <div class="stat-card online-devices">
+                    <div class="card-content">
+                        <span class="value">0 / 3</span>
+                        <span class="label">Thiết bị Online</span>
+                    </div>
+                    <i class="fas fa-plug card-icon-bg"></i>
+                </div>
 
-        statusEl.innerText = message;
-        statusEl.className = `text-center mb-8 p-3 rounded-lg font-medium shadow-md transition duration-300 ${colorClass}`;
-    }
-
-
-    // ========== DATA FETCHING LOGIC ==========
-
-    /**
-     * Lấy 30 bản ghi mới nhất từ Google Sheets Web App
-     */
-    async function fetchDataFromSheets(locationId) {
-        setStatus("loading", `🟡 Đang tải 30 bản ghi mới nhất cho ${locationId}...`);
-        
-        // Tạo URL GET request với tham số location
-        const apiUrl = `${GOOGLE_SHEET_WEB_APP_URL}?location=${locationId}`;
-
-        try {
-            const response = await fetch(apiUrl);
+                <div class="stat-card alerts-status">
+                    <div class="card-content">
+                        <span class="value">0 Cảnh báo</span>
+                        <span class="label">Chưa xử lý</span>
+                    </div>
+                    <i class="fas fa-exclamation-triangle card-icon-bg"></i>
+                </div>
+            </div>
             
-            let result;
-            try {
-                // Cố gắng parse JSON trước
-                result = await response.json(); 
-            } catch (jsonError) {
-                // Nếu parse JSON thất bại, đọc response dưới dạng text
-                const responseText = await response.text();
-                
-                // Nếu Web App chưa được triển khai đúng, responseText sẽ là HTML thông báo lỗi
-                console.error("[Sheets] Lỗi khi parse JSON. Nội dung phản hồi:", responseText);
-                
-                // Xử lý lỗi phổ biến nhất: Web App chưa được Public
-                if (responseText.startsWith("<!DOCTYPE html>") || responseText.includes("Web App đang chạy")) {
-                     setStatus("error", `🔴 LỖI CẤU HÌNH WEB APP: Vui lòng triển khai lại Apps Script và đặt "Ai có quyền truy cập" thành "Bất kỳ ai". (Lỗi: ${jsonError.name})`);
-                } else {
-                     setStatus("error", `🔴 LỖI TẢI DỮ LIỆU: Phản hồi không phải JSON hợp lệ. Chi tiết: ${jsonError.message}`);
-                }
-                clearAllCharts();
-                return; // Dừng hàm nếu parse JSON thất bại
-            }
+            <div class="reports-row">
+                <div class="report-box weekly-report">
+                    <h3>Báo cáo Hoạt động Tuần (Nhiệt độ TB)</h3>
+                    <div class="chart-area">
+                        <canvas id="weekly-chart-canvas"></canvas>
+                    </div>
+                </div>
 
-            // Xử lý kết quả JSON thành công
-            if (result.result === "success") {
-                const records = result.data || [];
-                
-                if (records.length === 0) {
-                    setStatus("success", `🟢 Kết nối thành công. Không có dữ liệu để hiển thị cho ${locationId}.`);
-                    clearAllCharts();
-                } else {
-                    updateCharts(records);
-                    const timestamp = new Date().toLocaleTimeString('vi-VN', {hour12: false});
-                    setStatus("success", `🟢 Cập nhật lúc ${timestamp}. Đã tải ${records.length} bản ghi.`);
-                }
-            } else {
-                console.error("[Sheets] Lỗi khi tải dữ liệu:", result.message);
-                setStatus("error", `🔴 LỖI TẢI DỮ LIỆU: ${result.message}`);
-                clearAllCharts();
-            }
+                <div class="report-box yearly-report">
+                    <h3>Tổng quan Dữ liệu Năm</h3>
+                    <div class="chart-area">
+                        <canvas id="yearly-chart-canvas"></canvas>
+                    </div>
+                    
+                    <div class="yearly-summary">
+                        <div class="summary-item">
+                            <span class="amount" id="sum-total-events">0</span>
+                            <span class="caption">Tổng số bản ghi</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="amount" id="sum-critical-alerts" style="color: #dc3545;">0</span>
+                            <span class="caption">Cảnh báo đỏ</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="amount" id="sum-online-rate">100%</span>
+                            <span class="caption">Độ ổn định</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-        } catch (error) {
-            console.error("[Sheets] Lỗi kết nối hoặc parse JSON:", error);
-            setStatus("error", `🔴 LỖI KẾT NỐI SHEETS: Vui lòng kiểm tra URL Web App.`);
-            clearAllCharts();
-        }
-    }
+        <div id="monitoring" class="tab-content">
+            <h1>🌡 Giám sát Thời gian Thực</h1>
+            <div class="reports-row">
+                <div class="report-box" style="flex: 1; min-height: 400px;">
+                    <h3>Trạng thái các Sensor Nodes</h3>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Thiết bị</th>
+                                <th>Nhiệt độ (°C)</th>
+                                <th>Độ ẩm (%)</th>
+                                <th>Khí Gas (ppm)</th>
+                                <th>Bụi (mg/m³)</th>
+                                <th>Trạng thái</th>
+                            </tr>
+                        </thead>
+                        <tbody id="monitoring-table-body">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="statistics" class="tab-content">
+            <h1>📈 Phân tích 30 Ngày Gần Nhất</h1>
+            <div class="stats-controls" style="margin-bottom: 20px; display: flex; gap: 15px; align-items: center;">
+                <label>Chọn thông số hiển thị:</label>
+                <select id="stats-metric-select" class="custom-select" onchange="renderAllNodesChart(this.value)">
+                    <option value="temp">Nhiệt độ (°C)</option>
+                    <option value="humid">Độ ẩm (%)</option>
+                    <option value="pm25">Bụi PM2.5 (µg/m³)</option>
+                    <option value="gas">Khí Gas (ppm)</option>
+                </select>
+                <button class="btn btn-primary" onclick="load30DayStats()"><i class="fas fa-sync"></i> Làm mới dữ liệu</button>
+            </div>
+        
+            <div id="charts-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 20px;">
+                </div>
+        </div>
+
+        <div id="alerts" class="tab-content">
+            <h1>🚨 Quản lý Cảnh báo</h1>
+            <div class="reports-row">
+                <div class="report-box" style="flex: 1;">
+                    <h3>Lịch sử Cảnh báo Hệ thống</h3>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Thời gian</th>
+                                <th>Thiết bị</th>
+                                <th>Loại lỗi</th>
+                                <th>Giá trị</th>
+                                <th>Trạng thái</th>
+                                <th>Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="data" class="tab-content">
+            <h1>🗃 Quản lý Dữ liệu</h1>
+            <div class="reports-row">
+                <div class="report-box" style="flex: 1;">
+                    <h3>Truy vấn & Xuất bản báo cáo</h3>
+                    <div class="query-controls" style="display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px; align-items: flex-end;">
+                        <div class="input-item">
+                            <label style="display:block;">Từ ngày:</label>
+                            <input type="date" id="query-start-date" class="custom-input">
+                        </div>
+                        <div class="input-item">
+                            <label style="display:block;">Đến ngày:</label>
+                            <input type="date" id="query-end-date" class="custom-input">
+                        </div>
+                        <div class="input-item">
+                            <label style="display:block;">Chọn Node:</label>
+                            <select id="query-node-select" class="custom-select">
+                                <option value="A101">Node A101</option>
+                                <option value="B202">Node B202</option>
+                                <option value="C303">Node C303</option>
+                                <option value="D404">Node D404</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" onclick="filterData()"><i class="fas fa-search"></i> Truy vấn</button>
+                        <button class="btn-excel-custom" onclick="exportToExcel()">
+                            <i class="fas fa-file-excel"></i> Xuất Excel (.xlsx)
+                        </button>
+                    </div>
+                    
+                    <div class="table-responsive" style="max-height: 500px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px;">
+                        <table id="query-result-table" class="data-table" style="width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th>Thời gian</th>
+                                    <th>Nhiệt độ (°C)</th>
+                                    <th>Độ ẩm (%)</th>
+                                    <th>Khí Gas (ppm)</th>
+                                    <th>Bụi PM2.5</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="settings" class="tab-content">
+            <div class="settings-card">
+                <h3><i class="fas fa-tools"></i> Cấu hình hệ thống</h3>
+                <p>Tùy chỉnh các thông số hiển thị trên Dashboard</p>
+                <hr>
+                <div style="margin-top: 20px;"></div>
+                <div class="setting-group">
+                    <label><i class="fas fa-microchip"></i> Chọn Node theo dõi chính:</label>
+                    <select id="node-select" class="custom-select" onchange="updateMainNode(this.value)">
+                        <option value="A101">Trạm A101 (Phòng khách)</option>
+                        <option value="B202">Trạm B202 (Phòng ngủ)</option>
+                        <option value="C303">Trạm C303 (Sân thượng)</option>
+                        <option value="D404">Trạm D404 (Nhà kho)</option>
+                    </select>
+                    <small>Dữ liệu Realtime và Biểu đồ sẽ lấy từ trạm này.</small>
+                </div>
+        
+                <div class="setting-group">
+                    <label><i class="fas fa-chart-line"></i> Thông số biểu đồ:</label>
+                    <select id="metric-select" class="custom-select" onchange="updateChartMetric(this.value)">
+                        <option value="temp">Nhiệt độ (°C)</option>
+                        <option value="humid">Độ ẩm (%)</option>
+                        <option value="pm25">Bụi PM2.5 (µg/m³)</option>
+                        <option value="gas">Khí Gas (ppm)</option>
+                    </select>
+                    <small>Chọn thông số muốn phân tích trên biểu đồ Tuần/Năm.</small>
+                </div>
+            </div>
+            <div class="setting-group">
+                <label><i class="fas fa-exclamation-triangle"></i> Cấu hình ngưỡng cảnh báo:</label>
+                <div class="threshold-inputs">
+                    <div class="input-item">
+                        <span>Nhiệt độ (°C):</span>
+                        <input type="number" id="threshold-temp" class="custom-input" onchange="updateThreshold('temp', this.value)">
+                    </div>
+                    <div class="input-item">
+                        <span>Khí Gas (ppm):</span>
+                        <input type="number" id="threshold-gas" class="custom-input" onchange="updateThreshold('gas', this.value)">
+                    </div>
+                    <div class="input-item">
+                        <span>Bụi PM2.5 (µg/m³):</span>
+                        <input type="number" id="threshold-pm25" class="custom-input" onchange="updateThreshold('pm25', this.value)">
+                    </div>
+                </div>
+                <small>Hệ thống sẽ ghi nhận cảnh báo nếu giá trị vượt quá các ngưỡng này.</small>
+            </div>
+            <div class="setting-group">
+                <label><i class="fas fa-clock"></i> Ngưỡng thời gian trạng thái (phút):</label>
+                <div class="threshold-inputs">
+                    <div class="input-item">
+                        <span>Online nếu dưới:</span>
+                        <input type="number" id="time-online-limit" class="custom-input" placeholder="Ví dụ: 5" onchange="updateTimeConfig('online', this.value)">
+                    </div>
+                    <div class="input-item">
+                        <span>Ngoại tuyến nếu dưới:</span>
+                        <input type="number" id="time-offline-limit" class="custom-input" placeholder="Ví dụ: 60" onchange="updateTimeConfig('offline', this.value)">
+                    </div>
+                </div>
+                <small>Nếu vượt quá ngưỡng "Ngoại tuyến", hệ thống sẽ báo "Mất kết nối".</small>
+            </div>
+        </div>
+        <div id="help" class="tab-content">
+            <h1>❓ Hướng dẫn sử dụng Hệ thống</h1>
+            
+            <div class="report-box" style="background: white; padding: 25px; border-radius: 15px; line-height: 1.6;">
+                <h3>1. Theo dõi Realtime (Dashboard)</h3>
+                <p>• Các ô màu phía trên hiển thị giá trị mới nhất từ các trạm (Node).<br>
+                   • Trạng thái <b>Online/Offline</b> dựa trên thời gian cập nhật cuối cùng so với cấu hình trong mục Cài đặt.</p>
+                <h3></h3>
+                <h3>2. Xem Biểu đồ thống kê</h3>
+                <p>• Vào tab <b>Biểu đồ & Thống kê</b> để xem xu hướng biến động trong 30 ngày.<br>
+                   • Bạn có thể chọn loại cảm biến (Nhiệt độ, Gas...) để thay đổi nội dung tất cả biểu đồ cùng lúc.</p>
+                   <h3></h3>
+                <h3>3. Truy vấn & Xuất dữ liệu</h3>
+                <p>• Vào tab <b>Dữ liệu</b>, chọn khoảng thời gian cần tra cứu và nhấn <b>Truy vấn</b>.<br>
+                   • Sau khi dữ liệu hiện ra, nhấn nút <b style="color: #1D6F42;">Xuất Excel</b> để tải file về máy tính.</p>
+                <h3></h3>
+                <h3>4. Cấu hình ngưỡng cảnh báo</h3>
+                <p>• Tại tab <b>Cài đặt</b>, bạn có thể chỉnh ngưỡng an toàn cho Nhiệt độ, PM2.5...<br>
+                   • Khi giá trị vượt ngưỡng, hệ thống sẽ tự động đổi màu hiển thị hoặc phát cảnh báo.</p>
+        
+                <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee; color: #666;">
+                    <p><i class="fas fa-info-circle"></i> <b>Lưu ý:</b> Nếu dữ liệu không cập nhật, hãy kiểm tra kết nối Wi-Fi của các thiết bị Node.</p>
+                </div>
+            </div>
+        </div>
+    </div> <div class="fixed-tools">
+        <div id="data-status" class="status-bar">
+            🟡 Đang kết nối server...
+        </div>
+    </div>
     
-    // ========== Event Handlers & Timing ==========
-
-    /**
-     * Thiết lập timer tự động làm mới dữ liệu
-     */
-    function startRefreshTimer() {
-        if (refreshTimer) {
-            clearInterval(refreshTimer);
-        }
-        // Gọi hàm fetch data ban đầu
-        fetchDataFromSheets(currentLocation); 
-
-        // Thiết lập timer lặp lại
-        refreshTimer = setInterval(() => {
-            fetchDataFromSheets(currentLocation);
-        }, REFRESH_INTERVAL_SECONDS * 1000); 
-
-        console.log(`[Timer] Đã thiết lập tự động làm mới sau mỗi ${REFRESH_INTERVAL_SECONDS} giây.`);
-    }
-
-
-    // Xử lý khi người dùng thay đổi địa điểm trên dropdown
-    document.getElementById('location-select').addEventListener('change', (event) => {
-        currentLocation = event.target.value;
-        console.log(`[Dashboard] Chuyển sang địa điểm: ${currentLocation}. Đang làm mới...`);
-        // Khởi động lại timer để fetch data mới ngay lập tức
-        startRefreshTimer(); 
-    });
-
-    // Xuất Excel
-    document.getElementById('export').onclick = function(){
-        if (dataLog.length === 0) {
-            console.warn("Chưa có dữ liệu theo dõi trên dashboard để xuất Excel.");
-            return;
-        }
-        
-        // Chuẩn bị dữ liệu Excel (dataLog đã được tải từ Google Sheet)
-        const excelData = dataLog.map(item => ({
-            'Thời gian': item.timestamp,
-            'Địa điểm': item.location,
-            'Nhiệt độ (°C)': item.temp,
-            'Độ ẩm (%)': item.humid,
-            'PM2.5 (µg/m³)': item.pm25,
-            'Khí Gas (PPM)': item.gas
-        }));
-        
-        let ws = XLSX.utils.json_to_sheet(excelData);
-        let wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, `Data Log ${currentLocation}`);
-        XLSX.writeFile(wb,`sensor_log_${currentLocation}_${new Date().toISOString().slice(0, 10)}.xlsx`);
-        console.log(`Xuất thành công ${dataLog.length} dòng dữ liệu cho ${currentLocation}.`);
-    };
-
-    // Khởi chạy khi tải trang
-    window.onload = startRefreshTimer;
-
-    console.log("Dashboard đã sẵn sàng. Dữ liệu đang được tải từ Google Sheets và tự động làm mới.");
-</script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="script.js"></script>
 
 </body>
 </html>

@@ -1,0 +1,279 @@
+/* --- BIẾN TOÀN CỤC & TỔNG QUAN --- */
+:root {
+    --primary: #1a1d23;
+    --sidebar-bg: #22262e;
+    --accent: #3498db;
+    --bg: #f0f2f5;
+    --text: #333;
+    --text-muted: #8e94a6;
+    --white: #ffffff;
+    --success: #2ecc71;
+    --danger: #e74c3c;
+    --warning: #f1c40f;
+    --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body { 
+    font-family: 'Inter', 'Segoe UI', Roboto, sans-serif; 
+    background-color: var(--bg); 
+    color: var(--text);
+    display: flex;
+    min-height: 100vh;
+}
+
+/* --- SIDEBAR --- */
+.sidebar {
+    width: 260px;
+    background: var(--sidebar-bg);
+    color: var(--text-muted);
+    height: 100vh;
+    position: fixed;
+    left: 0; top: 0;
+    z-index: 1000;
+    box-shadow: 4px 0 10px rgba(0,0,0,0.1);
+}
+
+.logo { 
+    padding: 30px 20px; 
+    text-align: center; 
+    color: var(--white); 
+    border-bottom: 1px solid rgba(255,255,255,0.05); 
+}
+
+.logo h2 { letter-spacing: 2px; font-weight: 800; color: var(--accent); }
+
+.sidebar-nav ul { list-style: none; padding: 20px 0; }
+
+.sidebar-nav li a {
+    display: flex; align-items: center; padding: 14px 25px;
+    color: #9ea5b1; text-decoration: none; transition: all 0.3s ease;
+    font-size: 0.95rem; font-weight: 500;
+}
+
+.sidebar-nav li a:hover, .sidebar-nav li a.active {
+    background: rgba(255,255,255,0.05);
+    color: var(--white);
+    border-left: 4px solid var(--accent);
+}
+
+.sidebar-nav i { margin-right: 15px; width: 20px; text-align: center; font-size: 1.1rem; }
+
+/* --- NỘI DUNG CHÍNH --- */
+.main-content { 
+    margin-left: 260px; 
+    flex: 1; 
+    padding: 40px; 
+    width: calc(100% - 260px); 
+}
+
+.tab-content { display: none; animation: slideUp 0.4s ease-out; }
+.tab-content.active-tab { display: block; }
+
+@keyframes slideUp { 
+    from { opacity: 0; transform: translateY(20px); } 
+    to { opacity: 1; transform: translateY(0); } 
+}
+
+h1 { margin-bottom: 30px; font-size: 1.8rem; font-weight: 700; color: var(--primary); }
+
+/* --- STAT CARDS --- */
+.stat-cards-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 20px;
+    margin-bottom: 35px;
+}
+
+.stat-card {
+    min-height: 130px; border-radius: 15px; padding: 25px; color: var(--white);
+    position: relative; overflow: hidden; display: flex; flex-direction: column;
+    justify-content: center; transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.stat-card:hover { transform: translateY(-5px); box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
+
+.stat-card .value { font-size: 2.2rem; font-weight: 800; z-index: 2; margin-bottom: 5px; }
+.stat-card .label { font-size: 0.85rem; font-weight: 500; opacity: 0.85; z-index: 2; text-transform: uppercase; }
+
+.card-icon-bg {
+    position: absolute; right: -10px; bottom: -10px;
+    font-size: 5rem; opacity: 0.15; z-index: 1; transform: rotate(-15deg);
+}
+
+/* Colors for cards */
+.temperature { background: linear-gradient(135deg, #ff6b6b, #ee5253); }
+.humidity { background: linear-gradient(135deg, #48dbfb, #2e86de); }
+.gas { background: linear-gradient(135deg, #576574, #222f3e); }
+.dust { background: linear-gradient(135deg, #8395a7, #546e7a); }
+.online-devices { background: linear-gradient(135deg, #a29bfe, #6c5ce7); }
+.alerts-status { background: linear-gradient(135deg, #ff9f43, #ee5253); }
+
+/* --- BÁO CÁO & BIỂU ĐỒ --- */
+.reports-row { display: flex; gap: 25px; flex-wrap: wrap; margin-bottom: 25px; }
+
+.report-box { 
+    background: var(--white); padding: 30px; border-radius: 16px; 
+    flex: 1; min-width: 450px; box-shadow: var(--shadow);
+}
+
+.report-box h3 { margin-bottom: 20px; font-size: 1.1rem; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+
+.chart-area { width: 100%; height: 320px; position: relative; }
+
+/* Thống kê năm (Summary dưới biểu đồ) */
+.yearly-summary {
+    display: flex; justify-content: space-around;
+    margin-top: 25px; padding-top: 20px; border-top: 1px solid #f0f0f0;
+}
+.summary-item { text-align: center; }
+.summary-item .amount { display: block; font-size: 1.5rem; font-weight: 700; color: var(--primary); }
+.summary-item .caption { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; }
+
+/* --- BẢNG DỮ LIỆU --- */
+.data-table { width: 100%; border-collapse: collapse; margin-top: 10px; border-radius: 8px; overflow: hidden; }
+.data-table th { 
+    background: #f8f9fa; color: var(--text-muted); font-weight: 600; 
+    text-transform: uppercase; font-size: 0.75rem; letter-spacing: 1px;
+    padding: 15px; border-bottom: 2px solid #edf2f7; text-align: left;
+}
+.data-table td { padding: 15px; border-bottom: 1px solid #edf2f7; font-size: 0.95rem; }
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover { background-color: #fcfcfc; }
+
+.alert-critical { background-color: #fff5f5 !important; color: var(--danger); }
+.alert-resolved { background-color: #f0fff4 !important; color: var(--success); }
+
+/* --- CÔNG CỤ CỐ ĐỊNH & BUTTONS --- */
+.fixed-tools { position: fixed; bottom: 30px; right: 30px; display: flex; flex-direction: column; gap: 12px; z-index: 2000; }
+
+.action-btn { 
+    padding: 12px 24px; border: none; border-radius: 30px; cursor: pointer;
+    font-weight: 600; display: flex; align-items: center; gap: 10px; 
+    box-shadow: 0 10px 20px rgba(46, 204, 113, 0.3); transition: all 0.3s;
+}
+.export-btn { background: var(--success); color: white; }
+.export-btn:hover { transform: scale(1.05); background: #27ae60; }
+
+.status-bar { 
+    padding: 10px 20px; background: var(--white); border-radius: 30px; 
+    border: 1px solid #eee; font-size: 0.8rem; font-weight: 500;
+    box-shadow: var(--shadow); color: var(--text-muted);
+}
+
+.btn-primary { 
+    background: var(--accent); color: white; padding: 10px 20px; 
+    border: none; border-radius: 8px; cursor: pointer; transition: 0.3s;
+}
+.btn-primary:hover { background: #2980b9; box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3); }
+
+/* --- ĐÁP ỨNG (RESPONSIVE) --- */
+@media (max-width: 1024px) {
+    .sidebar { width: 80px; }
+    .sidebar .logo h2, .sidebar span { display: none; }
+    .main-content { margin-left: 80px; width: calc(100% - 80px); padding: 20px; }
+    .report-box { min-width: 100%; }
+}
+
+@media (max-width: 768px) {
+    .stat-cards-row { grid-template-columns: 1fr; }
+}
+.settings-card {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    max-width: 600px;
+    margin: 20px auto;
+}
+
+.setting-group {
+    margin-bottom: 25px;
+    display: flex;
+    flex-direction: column;
+}
+
+.setting-group label {
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: #333;
+}
+
+.custom-select {
+    padding: 12px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 16px;
+    outline: none;
+    transition: border-color 0.3s;
+}
+
+.custom-select:focus {
+    border-color: #3498db;
+}
+
+.setting-group small {
+    color: #7f8c8d;
+    margin-top: 5px;
+}
+.threshold-inputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-top: 10px;
+}
+
+.input-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.input-item span {
+    font-size: 14px;
+    color: #666;
+}
+
+.custom-input {
+    padding: 10px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.custom-input:focus {
+    border-color: #e74c3c; /* Màu đỏ cho cảnh báo */
+    outline: none;
+}
+/* Định dạng nút Xuất Excel chuyên nghiệp */
+.btn-excel-custom {
+    background: linear-gradient(135deg, #1D6F42 0%, #28a745 100%); /* Màu xanh Excel */
+    color: white;
+    border: none;
+    padding: 10px 24px;
+    font-size: 15px;
+    font-weight: 600;
+    border-radius: 50px; /* Bo tròn kiểu viên thuốc giống image_d23464.png */
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+}
+
+.btn-excel-custom:hover {
+    background: linear-gradient(135deg, #218838 0%, #1e7e34 100%);
+    transform: translateY(-2px); /* Nhảy nhẹ lên khi hover */
+    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+    color: #ffffff;
+}
+
+.btn-excel-custom:active {
+    transform: translateY(0);
+}
+
+.btn-excel-custom i {
+    font-size: 18px; /* Cho icon to hơn một chút */
+}
